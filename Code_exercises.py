@@ -5,15 +5,24 @@
 
 
 #Get a few dependencies
-import sklearn
 import numpy as np
+from numpy import mean
+from numpy import std
 import pandas as pd
-import seaborn as sns
-import plotly.express as px
-from sklearn.cluster import MiniBatchKMeans
-from sklearn import metrics
-from sklearn.metrics import pairwise_distances
 import matplotlib.pyplot as plt
+import seaborn as sns
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.graphics .tsaplots import plot_acf, plot_pacf
+from sklearn import metrics                     #Some specific things from sklearn
+from sklearn import linear_model
+from sklearn.cluster import MiniBatchKMeans
+from sklearn.metrics import pairwise_distances
+from sklearn.datasets import make_classification
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsRegressor
 
 
 # In[2]:
@@ -43,7 +52,7 @@ xvalsSine_df = pd.read_csv('data/xvalsSine.csv', names=["xvals"])
 # Comment on which does better and why.
 
 
-# In[4]:
+# In[ ]:
 
 
 #take a peek at clustering df
@@ -58,7 +67,7 @@ sns.set_theme(style="ticks")
 sns.pairplot(clustering_df)
 
 
-# In[5]:
+# In[ ]:
 
 
 # Note - 
@@ -66,7 +75,7 @@ sns.pairplot(clustering_df)
 # but I'm going to try this exercise without normalizaing b/c the scale of the data provided is pretty balanced
 
 
-# In[6]:
+# In[ ]:
 
 
 #Tune # of clusters -- 
@@ -98,7 +107,7 @@ plt.title("Whats the best # of clusters? ... we already know its 4")
 plt.show
 
 
-# In[7]:
+# In[ ]:
 
 
 #Try some clustering -- Basically you can eyeball it and see 4 clusters. I'll do elbow method with Silhouette / Davies-Bouldin
@@ -120,21 +129,13 @@ sns.pairplot(clustering_df, hue='clusters')
 # mini_means.cluster_centers_
 
 
-# In[8]:
+# In[ ]:
 
 
 
 # --- Regression (Q1 part ii) ---
 
 #Classification Battle between Logistic Regression and RandomForest
-from numpy import mean
-from numpy import std
-from sklearn.datasets import make_classification
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import RepeatedStratifiedKFold
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-
 #Basic Regression Model, Basic Random Forest Model
 basic_model = LogisticRegression(multi_class='multinomial', solver='lbfgs')
 forest_model = RandomForestClassifier(n_estimators=10)
@@ -160,7 +161,7 @@ print('Forest Mean Accuracy: %.3f (%.3f)' % (mean(forest_score ), std(forest_sco
 print("\nBoth models are perfect? ... the dataset is too beautiful at four clusters. \nWhen you get over 4 clusters the models start to show falliability")
 
 
-# In[9]:
+# In[ ]:
 
 
 # 2) Prediction + filtering
@@ -180,7 +181,7 @@ print("\nBoth models are perfect? ... the dataset is too beautiful at four clust
 # (bonus) Can you code a Kalman filter to predict out 10 samples from the noisySine.csv data?
 
 
-# In[10]:
+# In[ ]:
 
 
 #This is what noisy looks like
@@ -191,7 +192,7 @@ sns.lineplot(x=xvalsSine_df['xvals'], y=cleanSine_df.clean, linewidth=2.5)
 print("Noisy sine is blue, clean sine is orange")
 
 
-# In[11]:
+# In[ ]:
 
 
 #Polynmial basis of sufficiently large order?
@@ -201,7 +202,7 @@ x_poly['ysine'] = cleanSine_df
 x_poly
 
 
-# In[12]:
+# In[ ]:
 
 
 #Sample into train(70%) and test(30%)
@@ -212,11 +213,10 @@ sine_test = x_poly[~x_poly.index.isin(sine_train.index)]
 pd.merge(sine_train, sine_test, on=list(x_poly.columns), how='inner')
 
 
-# In[13]:
+# In[ ]:
 
 
 #Make the linear model 
-from sklearn import linear_model
 sine_model = linear_model.LinearRegression()
 sine_model.fit(sine_train.loc[:, 'xval_1':'xval_5'], sine_train['ysine'])
 
@@ -231,11 +231,10 @@ trues = list(sine_test['ysine'])
 print(f'\nMSE for this model is {mean_squared_error(preds, trues)}')
 
 
-# In[14]:
+# In[ ]:
 
 
 #Try a KNN Regressor filter 
-from sklearn.neighbors import KNeighborsRegressor
 knn_filter = KNeighborsRegressor(n_neighbors=25, weights='uniform')
 knn_filter.fit(noisySine_df.index.values[:, np.newaxis], noisySine_df.noisy)
 y_filter = knn_filter.predict(noisySine_df.index.values[:, np.newaxis])
@@ -264,7 +263,7 @@ print("Noisy sine is blue, filtered sine is orange")
 # print('Hodrick-Prescott Filter (in orange)')
 
 
-# In[15]:
+# In[ ]:
 
 
 # 3) Time series with pi
@@ -293,60 +292,51 @@ print("These are the digits:\n")
 print(genPiAppxDigits(500, 100000))
 
 digits = [int(x) for x in str(genPiAppxDigits(1000, 100000)) if x.isnumeric()]
-sns.lineplot(x=list(range(len(digits))), y=digits)
-print("\n\nNo clear trend, so differencing for stationary probably unnecessary...\n\n")
+sns.lineplot(x=list(range(len(digits))), y=digits).set_title("These are our pi digits")
 
 
-# In[16]:
+# In[ ]:
 
 
-#Check for autocorrelation
-from pandas.plotting import autocorrelation_plot
-autocorrelation_plot(digits[:35])
-print("No autocorrelation either...")
+#It looks stationary but lets just check the acf
+plot_acf(pd.DataFrame(digits))
+plot_pacf(pd.DataFrame(digits))
+print("\nDoesn't look like we need to difference the series & dont see autocorrelation\n")
 
 
-# In[17]:
+# In[ ]:
 
 
-# ARMA example
-from statsmodels.tsa.arima.model import ARIMA
-from random import random
-
+# ARiMA example
 # So lets just try a Moving Average Model
-model = ARIMA(digits, order=(0, 0, 2))
+model = ARIMA(digits, order=(0, 0, 1))
 model_fit = model.fit()
 print(model_fit.summary())
 
 #Residuals
 residuals = pd.DataFrame(model_fit.resid)
-residuals.plot()
-print("\n\nResiduals seems stationary")
+residuals.plot().set_title("Residuals")
 residuals.plot(kind='kde')
 
 
-# In[18]:
+# In[ ]:
 
 
 # Make a prediction for the next pu digit
 yhat_1 = model_fit.predict(len(digits), len(digits))
 yhat_50 = model_fit.predict(start=1000, end=1049)
-print(yhat_50)
+print("Here are our predictions: \n", yhat_50)
 
-pd.DataFrame(yhat_50).plot()
+pd.DataFrame(yhat_50).plot().set_title("Prediction")
 print("\nIts basically predicting the average of 0~9")
-
-
-# In[19]:
-
 
 #Now lets see if there is any trend/signal in our errors 
 y_true = [int(x) for x in str(genPiAppxDigits(1050, 100000)) if x.isnumeric()][-50:]
-y_errors = pd.DataFrame(yhat_50 - y_true).plot()
+y_errors = pd.DataFrame(yhat_50 - y_true).plot().set_title("Errors")
 print(f'\nRMSE for this model is {mean_squared_error(yhat_50, y_true)**(1/2)}, and stdev for the pi digits series is {np.std(digits)}')
 
 
-# In[22]:
+# In[ ]:
 
 
 #Lets try taking a look at the cross-correlations (bonus part)
@@ -359,11 +349,13 @@ mask = np.triu(np.ones_like(appxAcc_df.corr(), dtype=bool))
 f, ax = plt.subplots(figsize=(11, 9))
 cmap = sns.diverging_palette(230, 20, as_cmap=True)
 sns.heatmap(appxAcc_df.corr(), mask=mask, cmap=cmap, vmax=.3, center=0, annot=True,
-            square=True, linewidths=.5, cbar_kws={"shrink": .5})
-print("\nCorr plot relationships between appxAcc variables")
+            square=True, linewidths=.5, cbar_kws={"shrink": .5}).set_title("Corr plot relationships between appxAcc variables")
+print("\nSee how fast these pi estimators diverge...\n")
+
+appxAcc_df.head(16)
 
 
-# In[21]:
+# In[ ]:
 
 
 #It seems like the pi digits are just white noise
